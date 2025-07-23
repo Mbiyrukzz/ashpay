@@ -24,7 +24,7 @@ const Avatar = styled.img`
 
 const Navbar = () => (
   <Topbar>
-    <Welcome>Welcome back, Fayzur R. Priad</Welcome>
+    <Welcome>Welcome back, Ashmif Office Solutions</Welcome>
     <Avatar src="https://i.pravatar.cc/40" alt="avatar" />
   </Topbar>
 )

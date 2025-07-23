@@ -45,7 +45,7 @@ const NavItem = styled.div`
 const Sidebar = () => {
   return (
     <SidebarContainer>
-      <Logo>PrestigeHub</Logo>
+      <Logo>AshPay</Logo>
       <NavItem active>
         <FontAwesomeIcon icon={faTachometerAlt} /> Dashboard
       </NavItem>
