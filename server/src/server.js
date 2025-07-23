@@ -4,7 +4,14 @@ const mongoose = require('mongoose')
 const cors = require('cors')
 const { routes } = require('./routes')
 
+const admin = require('firebase-admin')
+const credentials = require('./config/credentials.json')
+
 dotenv.config()
+
+admin.initializeApp({
+  credential: admin.credential.cert(credentials),
+})
 
 // Initialize app
 const app = express()
@@ -17,7 +24,7 @@ routes.forEach((route) => {
   }
 
   const fullPath = `/api${route.path}`
-  console.log(`Registering path: ${route.path.toUpperCase()} ${fullPath}`)
+  console.log(`Registering path: ${route.method.toUpperCase()} ${fullPath}`)
 
   if (route.middleware) {
     app[route.method](fullPath, ...route.middleware, route.handler)

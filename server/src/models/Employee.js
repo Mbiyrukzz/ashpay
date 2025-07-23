@@ -1,37 +1,25 @@
+const { v4: uuidv4 } = require('uuid')
 const mongoose = require('mongoose')
 
 // Deduction sub-schema
 const deductionSchema = new mongoose.Schema({
-  type: {
-    type: String,
-    required: true,
-    trim: true,
-  },
-  amount: {
-    type: Number,
-    required: true,
-    min: 0,
-  },
-  recurring: {
-    type: Boolean,
-    default: true,
-  },
+  type: { type: String, required: true, trim: true },
+  amount: { type: Number, required: true, min: 0 },
+  recurring: { type: Boolean, default: true },
 })
 
 // Employee schema
 const employeeSchema = new mongoose.Schema(
   {
-    name: {
-      type: String,
-      required: true,
-      trim: true,
-    },
-    employeeId: {
+    id: {
       type: String,
       required: true,
       unique: true,
       index: true,
+      default: uuidv4,
     },
+    name: { type: String, required: true, trim: true },
+    employeeId: { type: String, required: true, unique: true, index: true },
     email: {
       type: String,
       required: true,
@@ -39,61 +27,22 @@ const employeeSchema = new mongoose.Schema(
       lowercase: true,
       trim: true,
     },
-    phone: {
-      type: String,
-      trim: true,
-    },
-    position: {
-      type: String,
-      trim: true,
-    },
-    department: {
-      type: String,
-      trim: true,
-    },
-    salary: {
-      type: Number,
-      required: true,
-      min: 0,
-    },
-    deductions: {
-      type: [deductionSchema],
-      default: [],
-    },
-    benefits: {
-      type: [String],
-      default: [],
-    },
-    netPay: {
-      type: Number,
-      default: 0,
-    },
+    phone: { type: String, trim: true },
+    position: { type: String, trim: true },
+    department: { type: String, trim: true },
+    salary: { type: Number, required: true, min: 0 },
+    deductions: { type: [deductionSchema], default: [] },
+    benefits: { type: [String], default: [] },
+    netPay: { type: Number, default: 0 },
     bankDetails: {
-      bankName: {
-        type: String,
-        trim: true,
-      },
-      accountNumber: {
-        type: String,
-        trim: true,
-      },
-      branch: {
-        type: String,
-        trim: true,
-      },
+      bankName: { type: String, trim: true },
+      accountNumber: { type: String, trim: true },
+      branch: { type: String, trim: true },
     },
-    hireDate: {
-      type: Date,
-      default: Date.now,
-    },
-    isActive: {
-      type: Boolean,
-      default: true,
-    },
+    hireDate: { type: Date, default: Date.now },
+    isActive: { type: Boolean, default: true },
   },
-  {
-    timestamps: true,
-  }
+  { timestamps: true }
 )
 
 // Auto-calculate netPay before saving

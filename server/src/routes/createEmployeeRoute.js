@@ -1,3 +1,4 @@
+const { v4: uuidv4 } = require('uuid')
 const Employee = require('../models/Employee')
 
 const createEmployeeRoute = {
@@ -17,27 +18,24 @@ const createEmployeeRoute = {
         benefits = [],
         bankDetails = {},
         employeeId,
+        id = uuidv4(), // default or from client
       } = req.body
 
-      // Basic validation
       if (!name?.trim() || !email?.trim() || !salary) {
-        return res.status(400).json({
-          error: 'Name, email, and salary are required.',
-        })
+        return res
+          .status(400)
+          .json({ error: 'Name, email, and salary are required.' })
       }
 
-      // Check duplicate email or employeeId
       const existing = await Employee.findOne({
         $or: [{ email: email.trim() }, { employeeId }],
       })
       if (existing) {
-        return res.status(409).json({
-          error: 'An employee with this email or ID already exists.',
-        })
+        return res.status(409).json({ error: 'Employee already exists.' })
       }
 
-      // Create and save employee
       const newEmployee = new Employee({
+        id,
         name: name.trim(),
         email: email.trim().toLowerCase(),
         phone,
@@ -58,10 +56,9 @@ const createEmployeeRoute = {
       })
     } catch (error) {
       console.error('Error creating employee:', error)
-      res.status(500).json({
-        error: 'Failed to create employee',
-        details: error.message,
-      })
+      res
+        .status(500)
+        .json({ error: 'Failed to create employee', details: error.message })
     }
   },
 }
