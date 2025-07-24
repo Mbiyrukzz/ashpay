@@ -10,6 +10,7 @@ import {
   faCogs,
 } from '@fortawesome/free-solid-svg-icons'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
+import { NavLink, useLocation } from 'react-router-dom'
 
 const SidebarContainer = styled.div`
   width: 250px;
@@ -27,15 +28,16 @@ const Logo = styled.div`
   margin-bottom: 2rem;
 `
 
-const NavItem = styled.div`
+const StyledNavLink = styled(NavLink)`
   display: flex;
   align-items: center;
   gap: 1rem;
   padding: 0.75rem 1rem;
   margin-bottom: 0.5rem;
   border-radius: 10px;
-  cursor: pointer;
-  background: ${({ active }) => (active ? '#1a202e' : 'transparent')};
+  text-decoration: none;
+  color: white;
+  background: ${({ $active }) => ($active ? '#1a202e' : 'transparent')};
 
   &:hover {
     background: #1a202e;
@@ -43,27 +45,38 @@ const NavItem = styled.div`
 `
 
 const Sidebar = () => {
+  const location = useLocation()
+
   return (
     <SidebarContainer>
       <Logo>AshPay</Logo>
-      <NavItem active>
+      <StyledNavLink to="/" $active={location.pathname === '/dashboard'}>
         <FontAwesomeIcon icon={faTachometerAlt} /> Dashboard
-      </NavItem>
-      <NavItem>
+      </StyledNavLink>
+      <StyledNavLink
+        to="/employees"
+        $active={location.pathname === '/employees'}
+      >
         <FontAwesomeIcon icon={faUser} /> Employee
-      </NavItem>
-      <NavItem>
+      </StyledNavLink>
+      <StyledNavLink
+        to="/attendance"
+        $active={location.pathname === '/attendance'}
+      >
         <FontAwesomeIcon icon={faCalendarAlt} /> Attendance
-      </NavItem>
-      <NavItem>
+      </StyledNavLink>
+      <StyledNavLink to="/payroll" $active={location.pathname === '/payroll'}>
         <FontAwesomeIcon icon={faMoneyBill} /> Payroll
-      </NavItem>
-      <NavItem>
+      </StyledNavLink>
+      <StyledNavLink
+        to="/analytics"
+        $active={location.pathname === '/analytics'}
+      >
         <FontAwesomeIcon icon={faChartBar} /> Report & Analytics
-      </NavItem>
-      <NavItem>
+      </StyledNavLink>
+      <StyledNavLink to="/settings" $active={location.pathname === '/settings'}>
         <FontAwesomeIcon icon={faCogs} /> Settings
-      </NavItem>
+      </StyledNavLink>
     </SidebarContainer>
   )
 }

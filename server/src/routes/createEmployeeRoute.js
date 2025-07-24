@@ -1,5 +1,8 @@
 const { v4: uuidv4 } = require('uuid')
 const Employee = require('../models/Employee')
+const { calculateKraDeductions } = require('../controllers/kraDeductions')
+
+const validatePhone = (phone) => /^(\+?\d{10,15})$/.test(phone)
 
 const createEmployeeRoute = {
   method: 'post',
@@ -18,7 +21,7 @@ const createEmployeeRoute = {
         benefits = [],
         bankDetails = {},
         employeeId,
-        id = uuidv4(), // default or from client
+        id = uuidv4(),
       } = req.body
 
       if (!name?.trim() || !email?.trim() || !salary) {
@@ -27,12 +30,21 @@ const createEmployeeRoute = {
           .json({ error: 'Name, email, and salary are required.' })
       }
 
+      if (phone && !validatePhone(phone)) {
+        return res.status(400).json({ error: 'Invalid phone number format.' })
+      }
+
       const existing = await Employee.findOne({
         $or: [{ email: email.trim() }, { employeeId }],
       })
+
       if (existing) {
         return res.status(409).json({ error: 'Employee already exists.' })
       }
+
+      // Combine user-provided and KRA deductions
+      const kraDeductions = calculateKraDeductions(salary)
+      const allDeductions = [...deductions, ...kraDeductions]
 
       const newEmployee = new Employee({
         id,
@@ -42,7 +54,7 @@ const createEmployeeRoute = {
         department,
         position,
         salary,
-        deductions,
+        deductions: allDeductions,
         benefits,
         bankDetails,
         employeeId,

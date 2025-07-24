@@ -1,13 +1,10 @@
-import React from 'react'
-import { Navigate } from 'react-router-dom'
-import useUser from '../hooks/useUser'
+import { Navigate, Outlet } from 'react-router-dom'
+import Loading from './Loading'
 
-const ProtectedRoute = ({ children }) => {
-  const { user, loading } = useUser()
+const ProtectedRoute = ({ canAccess, isLoading, redirectTo }) => {
+  if (isLoading) return <Loading />
 
-  if (loading) return <div>Loading...</div>
-
-  return user ? children : <Navigate to="/login" replace />
+  return canAccess ? <Outlet /> : <Navigate to={redirectTo} replace />
 }
 
 export default ProtectedRoute

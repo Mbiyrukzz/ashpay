@@ -2,6 +2,9 @@ import React, { useState } from 'react'
 import styled from 'styled-components'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faEnvelope, faLock } from '@fortawesome/free-solid-svg-icons'
+import { signInWithEmailAndPassword } from 'firebase/auth'
+import { auth } from '../firebase/setupFirebase'
+import { useNavigate } from 'react-router-dom'
 
 const FormWrapper = styled.div`
   background: rgba(255, 255, 255, 0.9);
@@ -79,10 +82,31 @@ const Button = styled.button`
 const LoginForm = () => {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const navigate = useNavigate()
 
   const handleLogin = async (e) => {
     e.preventDefault()
-    console.log('Logging in with:', email, password)
+
+    try {
+      const userCredential = await signInWithEmailAndPassword(
+        auth,
+        email,
+        password
+      )
+      const user = userCredential.user
+      const idToken = await user.getIdToken()
+
+      console.log('✅ Logged in user:', user)
+      console.log('🔐 Firebase ID Token:', idToken)
+
+      localStorage.setItem('token', idToken)
+
+      // ✅ Redirect to dashboard
+      navigate('/')
+    } catch (error) {
+      console.error('❌ Login failed:', error.message)
+      alert('Login failed: ' + error.message)
+    }
   }
 
   return (

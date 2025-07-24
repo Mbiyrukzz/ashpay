@@ -1,50 +1,66 @@
-import { useEffect, useState } from 'react'
-import { auth } from '../firebase/setupFirebase'
+import { useEffect, useState, useCallback } from 'react'
+import useUser from './useUser'
+import axios from 'axios'
 
 const useAuthedRequest = () => {
+  const { user } = useUser()
   const [token, setToken] = useState(null)
+  const [isReady, setIsReady] = useState(false)
 
   useEffect(() => {
-    const fetchToken = async () => {
-      const user = auth.currentUser
-      if (user) {
-        const idToken = await user.getIdToken()
-        setToken(idToken)
+    let isMounted = true
+
+    const createToken = async () => {
+      try {
+        if (!user) {
+          setToken(null)
+          setIsReady(false)
+          return
+        }
+
+        const token = await user.firebaseUser.getIdToken()
+
+        if (isMounted) {
+          setToken(token)
+          setIsReady(true)
+        }
+      } catch (error) {
+        console.error('❌ Error fetching token:', error)
+        if (isMounted) {
+          setIsReady(false)
+        }
       }
     }
 
-    const unsubscribe = auth.onAuthStateChanged((user) => {
-      if (user) {
-        user.getIdToken().then(setToken)
-      } else {
-        setToken(null)
-      }
-    })
+    createToken()
 
-    fetchToken()
-    return () => unsubscribe()
-  }, [])
-
-  const authedFetch = async (url, options = {}) => {
-    if (!token) throw new Error('User not authenticated')
-
-    const res = await fetch(url, {
-      ...options,
-      headers: {
-        ...(options.headers || {}),
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      },
-    })
-
-    if (!res.ok) {
-      throw new Error(`HTTP error! status: ${res.status}`)
+    return () => {
+      isMounted = false
     }
+  }, [user])
 
-    return res.json()
-  }
+  // Generic function to handle authenticated requests
+  const request = useCallback(
+    async (method, url, body = null) => {
+      if (!token) throw new Error('No auth token available')
 
-  return authedFetch
+      const headers = { authtoken: token }
+      const response = await axios({ method, url, data: body, headers })
+      return response.data
+    },
+    [token]
+  )
+
+  // CRUD functions using `request`
+  const get = useCallback((url) => request('get', url), [request])
+  const post = useCallback((url, body) => request('post', url, body), [request])
+  const put = useCallback((url, body) => request('put', url, body), [request])
+  const del = useCallback(
+    (url, body) => request('delete', url, body),
+    [request]
+  )
+
+  return { isReady, get, post, put, del }
 }
 
 export default useAuthedRequest
