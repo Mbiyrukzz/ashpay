@@ -1,5 +1,6 @@
 import React, { useContext, useEffect } from 'react'
 import styled from 'styled-components'
+import { Link } from 'react-router-dom'
 import EmployeeContext from '../contexts/EmployeeContext'
 
 const Container = styled.div`
@@ -15,7 +16,7 @@ const Title = styled.h2`
   margin-bottom: 1.5rem;
 `
 
-const EmployeeItem = styled.div`
+const EmployeeItem = styled(Link)`
   background: white;
   padding: 1rem;
   border-radius: 6px;
@@ -24,6 +25,7 @@ const EmployeeItem = styled.div`
   display: flex;
   justify-content: space-between;
   align-items: center;
+  text-decoration: none;
 
   &:hover {
     background: #f1f5f9;
@@ -53,7 +55,7 @@ const EmployeeList = () => {
         <LoadingText>Loading...</LoadingText>
       ) : (
         employees.map((emp) => (
-          <EmployeeItem key={emp._id}>
+          <EmployeeItem to={`/employees/${emp._id}`} key={emp._id}>
             <EmployeeName>{emp.name}</EmployeeName>
           </EmployeeItem>
         ))

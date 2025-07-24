@@ -50,7 +50,7 @@ const Sidebar = () => {
   return (
     <SidebarContainer>
       <Logo>AshPay</Logo>
-      <StyledNavLink to="/" $active={location.pathname === '/dashboard'}>
+      <StyledNavLink to="/" $active={location.pathname === '/'}>
         <FontAwesomeIcon icon={faTachometerAlt} /> Dashboard
       </StyledNavLink>
       <StyledNavLink

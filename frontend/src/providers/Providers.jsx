@@ -1,12 +1,7 @@
 import EmployeeProvider from './EmployeeProvider'
-import PayrollOptionsProvider from './PayrollOptionsProvider'
 
 const Providers = ({ children }) => {
-  return (
-    <EmployeeProvider>
-      <PayrollOptionsProvider>{children}</PayrollOptionsProvider>
-    </EmployeeProvider>
-  )
+  return <EmployeeProvider>{children}</EmployeeProvider>
 }
 
 export default Providers

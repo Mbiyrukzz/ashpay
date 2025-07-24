@@ -10,6 +10,7 @@ import ProtectedRoute from './components/ProtectedRoute'
 import useUser from './hooks/useUser'
 import EmployeePage from './pages/EmployeePage'
 import Loading from './components/Loading'
+import EmployeeDetailsPage from './pages/EmployeeDetailsPage'
 
 const Layout = styled.div`
   display: flex;
@@ -69,6 +70,10 @@ const AppRoutes = () => {
             >
               <Route index element={<Dashboard />} />
               <Route path="/employees" element={<EmployeePage />} />
+              <Route
+                path="/employees/:employeeId"
+                element={<EmployeeDetailsPage />}
+              />
             </Route>
           </Routes>
         </Main>
