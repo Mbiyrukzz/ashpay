@@ -14,7 +14,7 @@ const benefitCalculators = {
   'Housing Allowance': (gross) => gross * 0.15, // 15%
   'Meal Allowance': () => 2000,
   'Phone Allowance': () => 1000,
-  Overtime: () => 0, // default 0
+  Overtime: () => 0,
   Commission: () => 0,
 }
 

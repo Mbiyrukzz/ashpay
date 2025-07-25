@@ -1,7 +1,17 @@
-import React, { useState, useContext, useEffect } from 'react'
+import React, { useState, useContext, useMemo } from 'react'
 import styled from 'styled-components'
 import EmployeeContext from '../contexts/EmployeeContext'
+import {
+  calculateKraDeductions,
+  calculateBenefits,
+  calculateSalaryBreakdown,
+  validatePayeCalculation,
+  DEFAULT_BENEFITS,
+  DEFAULT_DEDUCTIONS,
+  benefitCalculators,
+} from '../utils/kraDeductions'
 
+// Styled components
 const FormContainer = styled.div`
   max-height: 80vh;
   overflow-y: auto;
@@ -69,7 +79,6 @@ const Select = styled.select`
   border: 1px solid #d1d5db;
   border-radius: 6px;
   font-size: 1rem;
-  min-height: 100px;
   box-sizing: border-box;
 
   &:focus {
@@ -145,6 +154,17 @@ const Button = styled.button`
     }
   }
 
+  &.toggle {
+    background-color: #e2e8f0;
+    color: #374151;
+    padding: 0.5rem 1rem;
+    font-size: 0.9rem;
+
+    &:hover:not(:disabled) {
+      background-color: #d1d5db;
+    }
+  }
+
   &:disabled {
     background-color: #9ca3af;
     cursor: not-allowed;
@@ -209,7 +229,7 @@ const DeductionsList = styled.div`
   margin-bottom: 1rem;
 `
 
-const SmallText = styled.small`
+const SmallText = styled.div`
   color: #6b7280;
   font-size: 0.8rem;
   display: block;
@@ -223,123 +243,8 @@ const SectionTitle = styled.div`
   margin-bottom: 0.5rem;
 `
 
-const ItemList = styled.ul`
-  margin: 0.5rem 0;
-  padding-left: 1rem;
-  font-size: 0.8rem;
-
-  li {
-    margin-bottom: 0.25rem;
-  }
-`
-
-// KRA deductions calculation function (aligned with backend)
-const calculateKraDeductions = (salary) => {
-  if (!salary || isNaN(salary)) {
-    console.log('Invalid salary for KRA deductions:', salary)
-    return []
-  }
-
-  const deductions = []
-  const salaryNum = parseFloat(salary)
-  console.log('Calculating KRA deductions for salary:', salaryNum)
-
-  // NHIF (aligned with backend)
-  let nhif = 0
-  if (salaryNum <= 5999) nhif = 150
-  else if (salaryNum <= 7999) nhif = 300
-  else if (salaryNum <= 11999) nhif = 400
-  else nhif = 1700 // Simplified max tier
-  deductions.push({ type: 'NHIF', amount: nhif, recurring: true })
-
-  // NSSF (aligned with backend)
-  const nssf = Math.min(salaryNum * 0.06, 1080)
-  deductions.push({ type: 'NSSF', amount: Math.round(nssf), recurring: true })
-
-  // Housing Levy (aligned with backend)
-  const housingLevy = salaryNum * 0.015
-  deductions.push({
-    type: 'Housing Levy',
-    amount: Math.round(housingLevy),
-    recurring: true,
-  })
-
-  // PAYE (aligned with backend, no relief)
-  let paye = 0
-  if (salaryNum <= 24000) {
-    paye = salaryNum * 0.1
-  } else if (salaryNum <= 32333) {
-    paye = 24000 * 0.1 + (salaryNum - 24000) * 0.25
-  } else {
-    paye = 24000 * 0.1 + 8333 * 0.25 + (salaryNum - 32333) * 0.3
-  }
-  deductions.push({ type: 'PAYE', amount: Math.round(paye), recurring: true })
-
-  console.log('Calculated KRA Deductions:', deductions)
-  return deductions
-}
-
-// Benefits calculation functions
-const benefitCalculators = {
-  'Medical Insurance': (gross) => gross * 0.02,
-  'Transport Allowance': () => 3000,
-  'Housing Allowance': (gross) => gross * 0.15,
-  'Meal Allowance': () => 2000,
-  'Phone Allowance': () => 1000,
-  Overtime: () => 0,
-  Commission: () => 0,
-}
-
-const calculateBenefits = (salary, benefitConfig) => {
-  if (!salary || isNaN(salary)) {
-    console.log('Invalid salary for benefits calculation:', salary)
-    return []
-  }
-
-  const salaryNum = parseFloat(salary)
-  const benefits = []
-
-  Object.entries(benefitConfig).forEach(([type, config]) => {
-    if (config.enabled) {
-      const defaultAmount = benefitCalculators[type]
-        ? benefitCalculators[type](salaryNum)
-        : 0
-      const amount =
-        config.customAmount !== '' && !isNaN(config.customAmount)
-          ? parseFloat(config.customAmount)
-          : defaultAmount
-
-      benefits.push({
-        type,
-        amount: Math.round(amount),
-        recurring: !['Overtime', 'Commission'].includes(type),
-      })
-    }
-  })
-
-  console.log('Calculated Benefits:', benefits)
-  return benefits
-}
-
 const AddEmployeeForm = ({ onClose, onSuccess }) => {
   const { createEmployee } = useContext(EmployeeContext)
-
-  const defaultDeductions = [
-    'Loan Repayment',
-    'Advance Salary',
-    'Disciplinary Fine',
-    'Union Dues',
-  ]
-
-  const defaultBenefits = [
-    'Medical Insurance',
-    'Transport Allowance',
-    'Housing Allowance',
-    'Meal Allowance',
-    'Phone Allowance',
-    'Overtime',
-    'Commission',
-  ]
 
   const [form, setForm] = useState({
     name: '',
@@ -351,49 +256,84 @@ const AddEmployeeForm = ({ onClose, onSuccess }) => {
     employeeId: '',
   })
 
-  const [deductions, setDeductions] = useState([])
+  const [deductionConfig, setDeductionConfig] = useState(
+    DEFAULT_DEDUCTIONS.reduce((acc, ded) => {
+      acc[ded] = { enabled: false, amount: '' }
+      return acc
+    }, {})
+  )
+
   const [benefitConfig, setBenefitConfig] = useState(
-    defaultBenefits.reduce((acc, benefit) => {
+    DEFAULT_BENEFITS.reduce((acc, benefit) => {
       acc[benefit] = { enabled: false, customAmount: '' }
       return acc
     }, {})
   )
 
+  const [showBenefits, setShowBenefits] = useState(false)
   const [photo, setPhoto] = useState(null)
   const [error, setError] = useState(null)
   const [success, setSuccess] = useState(null)
   const [loading, setLoading] = useState(false)
-  const [kraDeductions, setKraDeductions] = useState([])
-  const [calculatedBenefits, setCalculatedBenefits] = useState([])
 
-  useEffect(() => {
-    console.log('useEffect triggered with form.salary:', form.salary)
-    if (form.salary && !isNaN(form.salary) && parseFloat(form.salary) > 0) {
-      const calculated = calculateKraDeductions(form.salary)
-      setKraDeductions(calculated)
-      console.log('Set kraDeductions:', calculated)
-      const benefits = calculateBenefits(form.salary, benefitConfig)
-      setCalculatedBenefits(benefits)
-      console.log('Set calculatedBenefits:', benefits)
-    } else {
-      setKraDeductions([])
-      setCalculatedBenefits([])
-      console.log(
-        'Reset kraDeductions and calculatedBenefits due to invalid salary:',
-        form.salary
-      )
-    }
-  }, [form.salary, benefitConfig])
+  const grossSalary = parseFloat(form.salary) || 0
+
+  const kraDeductions = useMemo(() => {
+    if (grossSalary <= 0) return []
+    return calculateKraDeductions(grossSalary)
+  }, [grossSalary])
+
+  const calculatedBenefits = useMemo(() => {
+    if (grossSalary <= 0) return []
+    return calculateBenefits(grossSalary, benefitConfig)
+  }, [grossSalary, benefitConfig])
+
+  const nonStatutoryDeductions = useMemo(() => {
+    return Object.entries(deductionConfig)
+      .filter(([config]) => config.enabled)
+      .map(([type, config]) => ({
+        type,
+        amount: parseFloat(config.amount) || 0,
+        recurring: true,
+      }))
+  }, [deductionConfig])
+
+  const breakdown = useMemo(() => {
+    return calculateSalaryBreakdown(
+      grossSalary,
+      [...kraDeductions, ...nonStatutoryDeductions],
+      calculatedBenefits
+    )
+  }, [grossSalary, kraDeductions, calculatedBenefits, nonStatutoryDeductions])
+
+  const payeValidation = useMemo(() => {
+    const paye = kraDeductions.find((ded) => ded.type === 'PAYE')?.amount || 0
+    return validatePayeCalculation(grossSalary, paye)
+  }, [grossSalary, kraDeductions])
 
   const handleChange = (e) => {
-    console.log('Input change:', { name: e.target.name, value: e.target.value })
     setForm({ ...form, [e.target.name]: e.target.value })
     if (error) setError(null)
   }
 
-  const handleSelectChange = (e, setFn) => {
-    const selected = Array.from(e.target.selectedOptions).map((o) => o.value)
-    setFn(selected)
+  const handleDeductionToggle = (deductionType) => {
+    setDeductionConfig((prev) => ({
+      ...prev,
+      [deductionType]: {
+        ...prev[deductionType],
+        enabled: !prev[deductionType].enabled,
+      },
+    }))
+  }
+
+  const handleDeductionAmountChange = (deductionType, amount) => {
+    setDeductionConfig((prev) => ({
+      ...prev,
+      [deductionType]: {
+        ...prev[deductionType],
+        amount,
+      },
+    }))
   }
 
   const handleBenefitToggle = (benefitType) => {
@@ -437,11 +377,11 @@ const AddEmployeeForm = ({ onClose, onSuccess }) => {
       setError('Name is required')
       return false
     }
-    if (!form.email.trim()) {
-      setError('Email is required')
+    if (!form.email.match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/)) {
+      setError('Please enter a valid email address')
       return false
     }
-    if (!form.salary || isNaN(form.salary) || parseFloat(form.salary) <= 0) {
+    if (grossSalary <= 0) {
       setError('Please enter a valid salary amount')
       return false
     }
@@ -449,12 +389,32 @@ const AddEmployeeForm = ({ onClose, onSuccess }) => {
       setError('Please enter a valid phone number')
       return false
     }
+    if (
+      Object.values(deductionConfig).some(
+        (config) =>
+          config.enabled &&
+          (isNaN(config.amount) || parseFloat(config.amount) < 0)
+      )
+    ) {
+      setError('Please enter valid amounts for selected deductions')
+      return false
+    }
+    if (
+      Object.values(benefitConfig).some(
+        (config) =>
+          config.enabled &&
+          config.customAmount !== '' &&
+          (isNaN(config.customAmount) || parseFloat(config.customAmount) < 0)
+      )
+    ) {
+      setError('Please enter valid amounts for selected benefits')
+      return false
+    }
     return true
   }
 
   const handleSubmit = async (e) => {
     e.preventDefault()
-
     if (!validateForm()) return
 
     setLoading(true)
@@ -462,61 +422,31 @@ const AddEmployeeForm = ({ onClose, onSuccess }) => {
     setSuccess(null)
 
     try {
-      const benefitOverrides = {}
-      const excludedBenefits = []
-
-      Object.entries(benefitConfig).forEach(([type, config]) => {
-        if (config.enabled) {
-          if (config.customAmount !== '' && config.customAmount !== null) {
-            benefitOverrides[type] = parseFloat(config.customAmount) || 0
-          }
-        } else {
-          excludedBenefits.push(type)
-        }
-      })
-
       const employeeData = {
         name: form.name.trim(),
         email: form.email.trim(),
         phone: form.phone.trim() || null,
         department: form.department.trim() || null,
         position: form.position.trim() || null,
-        salary: parseFloat(form.salary),
+        salary: grossSalary,
         employeeId: form.employeeId.trim() || undefined,
-        deductions,
-        benefits: {
-          benefitOverrides,
-          excludedBenefits,
-        },
-        bankDetails: {},
+        deductions: [...kraDeductions, ...nonStatutoryDeductions],
+        benefits: calculatedBenefits,
+        netSalary: breakdown.netSalary,
+        photo: null,
       }
 
       if (photo) {
         const reader = new FileReader()
-        reader.onloadend = async () => {
-          employeeData.photo = reader.result
-          await submitEmployee(employeeData)
-        }
-        reader.readAsDataURL(photo)
-      } else {
-        await submitEmployee(employeeData)
+        employeeData.photo = await new Promise((resolve) => {
+          reader.onloadend = () => resolve(reader.result)
+          reader.readAsDataURL(photo)
+        })
       }
-    } catch (err) {
-      console.error('Form submission error:', err)
-      setError('An unexpected error occurred. Please try again.')
-      setLoading(false)
-    }
-  }
 
-  const submitEmployee = async (employeeData) => {
-    try {
-      console.log('Submitting employeeData:', employeeData)
       const result = await createEmployee(employeeData)
       setSuccess('Employee created successfully!')
-
-      if (onSuccess) {
-        onSuccess(result)
-      }
+      if (onSuccess) onSuccess(result)
 
       setForm({
         name: '',
@@ -527,60 +457,57 @@ const AddEmployeeForm = ({ onClose, onSuccess }) => {
         salary: '',
         employeeId: '',
       })
-      setDeductions([])
+      setDeductionConfig(
+        DEFAULT_DEDUCTIONS.reduce((acc, ded) => {
+          acc[ded] = { enabled: false, amount: '' }
+          return acc
+        }, {})
+      )
       setBenefitConfig(
-        defaultBenefits.reduce((acc, benefit) => {
+        DEFAULT_BENEFITS.reduce((acc, benefit) => {
           acc[benefit] = { enabled: false, customAmount: '' }
           return acc
         }, {})
       )
       setPhoto(null)
+      setShowBenefits(false)
 
       setTimeout(() => {
         if (onClose) onClose()
       }, 1500)
     } catch (err) {
-      console.error('Employee creation error:', err)
       setError(err.message || 'Failed to create employee. Please try again.')
     } finally {
       setLoading(false)
     }
   }
 
-  const totalKraDeductions = kraDeductions.reduce(
-    (sum, ded) => sum + ded.amount,
-    0
-  )
-  const totalBenefits = calculatedBenefits.reduce(
-    (sum, ben) => sum + ben.amount,
-    0
-  )
-  const grossSalary = parseFloat(form.salary) || 0
-  const netSalary = grossSalary - totalKraDeductions + totalBenefits
-
   return (
     <FormContainer>
-      {error && <ErrorText>{error}</ErrorText>}
-      {success && <SuccessText>{success}</SuccessText>}
+      {error && <ErrorText role="alert">{error}</ErrorText>}
+      {success && <SuccessText role="alert">{success}</SuccessText>}
 
       <FormGrid>
         <FormSection>
           <form onSubmit={handleSubmit}>
             <Field>
-              <Label>Full Name *</Label>
+              <Label htmlFor="name">Full Name *</Label>
               <Input
+                id="name"
                 name="name"
                 value={form.name}
                 onChange={handleChange}
                 placeholder="Enter employee's full name"
                 required
                 disabled={loading}
+                aria-invalid={!!error && error.includes('Name')}
               />
             </Field>
 
             <Field>
-              <Label>Email Address *</Label>
+              <Label htmlFor="email">Email Address *</Label>
               <Input
+                id="email"
                 name="email"
                 type="email"
                 value={form.email}
@@ -588,12 +515,14 @@ const AddEmployeeForm = ({ onClose, onSuccess }) => {
                 placeholder="employee@company.com"
                 required
                 disabled={loading}
+                aria-invalid={!!error && error.includes('email')}
               />
             </Field>
 
             <Field>
-              <Label>Employee ID</Label>
+              <Label htmlFor="employeeId">Employee ID</Label>
               <Input
+                id="employeeId"
                 name="employeeId"
                 value={form.employeeId}
                 onChange={handleChange}
@@ -607,19 +536,22 @@ const AddEmployeeForm = ({ onClose, onSuccess }) => {
             </Field>
 
             <Field>
-              <Label>Phone Number</Label>
+              <Label htmlFor="phone">Phone Number</Label>
               <Input
+                id="phone"
                 name="phone"
                 value={form.phone}
                 onChange={handleChange}
                 placeholder="+254712345678"
                 disabled={loading}
+                aria-invalid={!!error && error.includes('phone')}
               />
             </Field>
 
             <Field>
-              <Label>Department</Label>
+              <Label htmlFor="department">Department</Label>
               <Input
+                id="department"
                 name="department"
                 value={form.department}
                 onChange={handleChange}
@@ -629,8 +561,9 @@ const AddEmployeeForm = ({ onClose, onSuccess }) => {
             </Field>
 
             <Field>
-              <Label>Position/Job Title</Label>
+              <Label htmlFor="position">Position/Job Title</Label>
               <Input
+                id="position"
                 name="position"
                 value={form.position}
                 onChange={handleChange}
@@ -640,8 +573,9 @@ const AddEmployeeForm = ({ onClose, onSuccess }) => {
             </Field>
 
             <Field>
-              <Label>Gross Salary (KES) *</Label>
+              <Label htmlFor="salary">Gross Salary (KES) *</Label>
               <Input
+                id="salary"
                 name="salary"
                 type="number"
                 min="0"
@@ -651,6 +585,7 @@ const AddEmployeeForm = ({ onClose, onSuccess }) => {
                 placeholder="50000"
                 required
                 disabled={loading}
+                aria-invalid={!!error && error.includes('salary')}
               />
               <SmallText>
                 Enter the gross salary before any deductions
@@ -658,8 +593,9 @@ const AddEmployeeForm = ({ onClose, onSuccess }) => {
             </Field>
 
             <Field>
-              <Label>Employee Photo</Label>
+              <Label htmlFor="photo">Employee Photo</Label>
               <Input
+                id="photo"
                 type="file"
                 accept="image/*"
                 onChange={handleFileChange}
@@ -672,73 +608,101 @@ const AddEmployeeForm = ({ onClose, onSuccess }) => {
 
             <Field>
               <Label>Additional Deductions</Label>
-              <Select
-                multiple
-                value={deductions}
-                onChange={(e) => handleSelectChange(e, setDeductions)}
-                disabled={loading}
-              >
-                {defaultDeductions.map((ded) => (
-                  <option key={ded} value={ded}>
-                    {ded}
-                  </option>
+              <BenefitConfig>
+                {DEFAULT_DEDUCTIONS.map((deduction) => (
+                  <BenefitRow key={deduction}>
+                    <BenefitLabel>
+                      <input
+                        type="checkbox"
+                        id={`deduction-${deduction}`}
+                        checked={deductionConfig[deduction].enabled}
+                        onChange={() => handleDeductionToggle(deduction)}
+                        disabled={loading}
+                      />
+                      <span>{deduction}</span>
+                    </BenefitLabel>
+                    {deductionConfig[deduction].enabled && (
+                      <BenefitInput
+                        type="number"
+                        min="0"
+                        placeholder="0"
+                        value={deductionConfig[deduction].amount}
+                        onChange={(e) =>
+                          handleDeductionAmountChange(deduction, e.target.value)
+                        }
+                        disabled={loading}
+                        aria-label={`Amount for ${deduction}`}
+                      />
+                    )}
+                  </BenefitRow>
                 ))}
-              </Select>
+              </BenefitConfig>
               <SmallText>
-                Hold Ctrl/Cmd to select multiple. Statutory deductions are
-                calculated automatically. Amounts will be set to 0 initially.
+                Check deductions to include. Enter amounts or leave as 0.
               </SmallText>
             </Field>
 
             <Field>
-              <Label>Benefits & Allowances</Label>
-              <BenefitConfig>
-                {defaultBenefits.map((benefit) => {
-                  const defaultAmount = form.salary
-                    ? Math.round(
-                        benefitCalculators[benefit]
-                          ? benefitCalculators[benefit](parseFloat(form.salary))
-                          : 0
-                      )
-                    : 0
+              <Label>Benefits & Allowances (Optional)</Label>
+              <Button
+                type="button"
+                className="toggle"
+                onClick={() => setShowBenefits(!showBenefits)}
+                disabled={loading}
+              >
+                {showBenefits ? 'Hide Benefits' : 'Add Benefits'}
+              </Button>
+              {showBenefits && (
+                <BenefitConfig>
+                  {DEFAULT_BENEFITS.map((benefit) => {
+                    const defaultAmount = grossSalary
+                      ? Math.round(
+                          benefitCalculators[benefit]
+                            ? benefitCalculators[benefit](grossSalary)
+                            : 0
+                        )
+                      : 0
 
-                  return (
-                    <BenefitRow key={benefit}>
-                      <BenefitLabel>
-                        <input
-                          type="checkbox"
-                          checked={benefitConfig[benefit].enabled}
-                          onChange={() => handleBenefitToggle(benefit)}
-                          disabled={loading}
-                        />
-                        {benefit}
-                        {defaultAmount > 0 && (
-                          <span
-                            style={{ color: '#6b7280', fontSize: '0.8rem' }}
-                          >
-                            (default: KES {defaultAmount.toLocaleString()})
-                          </span>
+                    return (
+                      <BenefitRow key={benefit}>
+                        <BenefitLabel>
+                          <input
+                            type="checkbox"
+                            id={`benefit-${benefit}`}
+                            checked={benefitConfig[benefit].enabled}
+                            onChange={() => handleBenefitToggle(benefit)}
+                            disabled={loading}
+                          />
+                          <span>{benefit}</span>
+                          {defaultAmount > 0 && (
+                            <span
+                              style={{ color: '#6b7280', fontSize: '0.8rem' }}
+                            >
+                              (default: KES {defaultAmount.toLocaleString()})
+                            </span>
+                          )}
+                        </BenefitLabel>
+                        {benefitConfig[benefit].enabled && (
+                          <BenefitInput
+                            type="number"
+                            min="0"
+                            placeholder={defaultAmount.toString()}
+                            value={benefitConfig[benefit].customAmount}
+                            onChange={(e) =>
+                              handleBenefitAmountChange(benefit, e.target.value)
+                            }
+                            disabled={loading}
+                            aria-label={`Custom amount for ${benefit}`}
+                          />
                         )}
-                      </BenefitLabel>
-                      {benefitConfig[benefit].enabled && (
-                        <BenefitInput
-                          type="number"
-                          min="0"
-                          placeholder={defaultAmount.toString()}
-                          value={benefitConfig[benefit].customAmount}
-                          onChange={(e) =>
-                            handleBenefitAmountChange(benefit, e.target.value)
-                          }
-                          disabled={loading}
-                        />
-                      )}
-                    </BenefitRow>
-                  )
-                })}
-              </BenefitConfig>
+                      </BenefitRow>
+                    )
+                  })}
+                </BenefitConfig>
+              )}
               <SmallText>
-                Check benefits to include. Leave amount blank to use default
-                calculation.
+                Benefits are optional. Click "Add Benefits" to select
+                allowances. Leave amount blank to use default calculation.
               </SmallText>
             </Field>
 
@@ -752,14 +716,14 @@ const AddEmployeeForm = ({ onClose, onSuccess }) => {
                 Cancel
               </Button>
               <Button type="submit" className="primary" disabled={loading}>
-                {loading ? 'Creating Employee...' : 'Create Employee'}
+                {loading ? 'Processing...' : 'Create Employee'}
               </Button>
             </ButtonGroup>
           </form>
         </FormSection>
 
-        <PreviewSection>
-          <PreviewTitle>Salary Breakdown</PreviewTitle>
+        <PreviewSection aria-labelledby="salary-breakdown">
+          <PreviewTitle id="salary-breakdown">Salary Breakdown</PreviewTitle>
 
           <PreviewItem>
             <span>Gross Salary:</span>
@@ -770,18 +734,27 @@ const AddEmployeeForm = ({ onClose, onSuccess }) => {
             <DeductionsList>
               <SectionTitle>Statutory Deductions:</SectionTitle>
               {kraDeductions.map((ded, index) => (
-                <PreviewItem
-                  key={index}
-                  style={{ color: ded.amount === 0 ? '#dc2626' : 'inherit' }}
-                >
+                <PreviewItem key={index}>
                   <span>{ded.type}:</span>
                   <span>-KES {ded.amount.toLocaleString()}</span>
                 </PreviewItem>
               ))}
               <PreviewItem className="total">
-                <span>Total Deductions:</span>
-                <span>-KES {totalKraDeductions.toLocaleString()}</span>
+                <span>Total Statutory Deductions:</span>
+                <span>-KES {breakdown.totalDeductions.toLocaleString()}</span>
               </PreviewItem>
+            </DeductionsList>
+          )}
+
+          {nonStatutoryDeductions.length > 0 && (
+            <DeductionsList>
+              <SectionTitle>Additional Deductions:</SectionTitle>
+              {nonStatutoryDeductions.map((ded, index) => (
+                <PreviewItem key={index}>
+                  <span>{ded.type}:</span>
+                  <span>-KES {ded.amount.toLocaleString()}</span>
+                </PreviewItem>
+              ))}
             </DeductionsList>
           )}
 
@@ -799,7 +772,7 @@ const AddEmployeeForm = ({ onClose, onSuccess }) => {
               <PreviewItem className="total">
                 <span>Total Benefits:</span>
                 <span style={{ color: '#059669' }}>
-                  +KES {totalBenefits.toLocaleString()}
+                  +KES {breakdown.totalBenefits.toLocaleString()}
                 </span>
               </PreviewItem>
             </DeductionsList>
@@ -807,25 +780,16 @@ const AddEmployeeForm = ({ onClose, onSuccess }) => {
 
           <PreviewItem className="net-salary">
             <span>Net Salary:</span>
-            <span>KES {netSalary.toLocaleString()}</span>
+            <span>KES {breakdown.netSalary.toLocaleString()}</span>
           </PreviewItem>
 
-          {deductions.length > 0 && (
-            <div
-              style={{
-                marginTop: '1rem',
-                fontSize: '0.8rem',
-                color: '#dc2626',
-              }}
+          {payeValidation.warning && (
+            <ErrorText
+              role="alert"
+              style={{ fontSize: '0.85rem', marginTop: '0.5rem' }}
             >
-              <SectionTitle>Additional Deductions:</SectionTitle>
-              <ItemList>
-                {deductions.map((ded, index) => (
-                  <li key={index}>{ded}</li>
-                ))}
-              </ItemList>
-              <em>Initial amounts will be set to 0 - specify later</em>
-            </div>
+              {payeValidation.warning}
+            </ErrorText>
           )}
 
           {grossSalary === 0 && (
@@ -841,20 +805,6 @@ const AddEmployeeForm = ({ onClose, onSuccess }) => {
               Enter a salary to see breakdown
             </div>
           )}
-          {grossSalary > 0 &&
-            kraDeductions.find((ded) => ded.type === 'PAYE')?.amount < 3000 && (
-              <div
-                style={{
-                  color: '#dc2626',
-                  fontSize: '0.85rem',
-                  marginTop: '0.5rem',
-                  fontStyle: 'italic',
-                }}
-              >
-                Warning: PAYE is below KES 3,000. Verify if salary (
-                {grossSalary.toLocaleString()}) is correct.
-              </div>
-            )}
         </PreviewSection>
       </FormGrid>
     </FormContainer>

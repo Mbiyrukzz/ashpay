@@ -174,9 +174,7 @@ const PreviewItem = styled.div`
   display: flex;
   justify-content: space-between;
   margin-bottom: 0.5rem;
-  padding: 0.25rem;
- 0;
-
+  padding: 0.25rem 0;
   font-size: 0.9rem;
 
   &.total {
@@ -215,7 +213,7 @@ const SectionTitle = styled.div`
   margin-bottom: 0.5rem;
 `
 
-// KRA deductions calculation function (updated with 2023 tax bands)
+// KRA deductions calculation function (aligned with backend)
 const calculateKraDeductions = (salary) => {
   if (!salary || isNaN(salary)) {
     console.log('Invalid salary for KRA deductions:', salary)
@@ -231,19 +229,11 @@ const calculateKraDeductions = (salary) => {
   if (salaryNum <= 5999) nhif = 150
   else if (salaryNum <= 7999) nhif = 300
   else if (salaryNum <= 11999) nhif = 400
-  else if (salaryNum <= 14999) nhif = 500
-  else if (salaryNum <= 19999) nhif = 600
-  else if (salaryNum <= 24999) nhif = 750
-  else if (salaryNum <= 29999) nhif = 850
-  else if (salaryNum <= 34999) nhif = 900
-  else if (salaryNum <= 39999) nhif = 950
-  else if (salaryNum <= 44999) nhif = 1000
-  else if (salaryNum <= 49999) nhif = 1100
   else nhif = 1700
   deductions.push({ type: 'NHIF', amount: nhif, recurring: true })
 
-  // NSSF (Tier I)
-  const nssf = Math.min(salaryNum, 6000) * 0.06
+  // NSSF
+  const nssf = Math.min(salaryNum * 0.06, 1080)
   deductions.push({ type: 'NSSF', amount: Math.round(nssf), recurring: true })
 
   // Housing Levy
@@ -254,30 +244,16 @@ const calculateKraDeductions = (salary) => {
     recurring: true,
   })
 
-  // PAYE (2023 tax bands)
+  // PAYE (with 200 KES monthly relief)
   let paye = 0
-  let remaining = salaryNum
-  if (remaining > 800000) {
-    paye += (remaining - 800000) * 0.35
-    remaining = 800000
+  if (salaryNum <= 24000) {
+    paye = salaryNum * 0.1
+  } else if (salaryNum <= 32333) {
+    paye = 24000 * 0.1 + (salaryNum - 24000) * 0.25
+  } else {
+    paye = 24000 * 0.1 + 8333 * 0.25 + (salaryNum - 32333) * 0.3
   }
-  if (remaining > 500000) {
-    paye += (remaining - 500000) * 0.325
-    remaining = 500000
-  }
-  if (remaining > 32333) {
-    paye += (remaining - 32333) * 0.3
-    remaining = 32333
-  }
-  if (remaining > 24000) {
-    paye += (remaining - 24000) * 0.25
-    remaining = 24000
-  }
-  if (remaining > 0) {
-    paye += remaining * 0.1
-  }
-  // Apply personal relief (2,400 KES per month)
-  paye = Math.max(paye - 2400, 0)
+  paye = Math.max(paye - 200, 0)
   deductions.push({ type: 'PAYE', amount: Math.round(paye), recurring: true })
 
   console.log('Calculated KRA Deductions:', deductions)
@@ -457,7 +433,7 @@ const EditEmployeeForm = () => {
         form.salary
       )
     }
-  }, [form.salary, benefitConfig, employees])
+  }, [form.salary, benefitConfig])
 
   const handleChange = (e) => {
     console.log('Input change:', { name: e.target.name, value: e.target.value })
@@ -794,17 +770,7 @@ const EditEmployeeForm = () => {
             <DeductionsList>
               <SectionTitle>Statutory Deductions:</SectionTitle>
               {kraDeductions.map((ded, index) => (
-                <PreviewItem
-                  key={index}
-                  style={{
-                    color:
-                      ded.amount === 0 &&
-                      ded.type === 'PAYE' &&
-                      grossSalary > 24000
-                        ? '#dc2626'
-                        : 'inherit',
-                  }}
-                >
+                <PreviewItem key={index}>
                   <span>{ded.type}:</span>
                   <span>-KES {ded.amount.toLocaleString()}</span>
                 </PreviewItem>
@@ -874,10 +840,10 @@ const EditEmployeeForm = () => {
               Enter a salary to see breakdown
             </div>
           )}
-          {kraDeductions.some(
-            (ded) => ded.type === 'PAYE' && ded.amount === 0
-          ) &&
-            grossSalary > 24000 && (
+          {grossSalary >= 32000 &&
+            Math.abs(
+              kraDeductions.find((ded) => ded.type === 'PAYE')?.amount - 3000
+            ) > 1000 && (
               <div
                 style={{
                   color: '#dc2626',
@@ -886,8 +852,12 @@ const EditEmployeeForm = () => {
                   fontStyle: 'italic',
                 }}
               >
-                Warning: PAYE is 0, which may be incorrect for a salary above
-                KES 24,000.
+                Warning: PAYE (KES{' '}
+                {kraDeductions
+                  .find((ded) => ded.type === 'PAYE')
+                  ?.amount.toLocaleString()}
+                ) deviates significantly from expected ~3,000 KES. Verify
+                salary.
               </div>
             )}
         </PreviewSection>
