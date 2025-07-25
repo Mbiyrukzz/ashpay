@@ -11,6 +11,7 @@ import useUser from './hooks/useUser'
 import EmployeePage from './pages/EmployeePage'
 import Loading from './components/Loading'
 import EmployeeDetailsPage from './pages/EmployeeDetailsPage'
+import EditEmployeeForm from './components/EmployeeEditForm'
 
 const Layout = styled.div`
   display: flex;
@@ -73,6 +74,11 @@ const AppRoutes = () => {
               <Route
                 path="/employees/:employeeId"
                 element={<EmployeeDetailsPage />}
+              />
+              // App.jsx or router setup
+              <Route
+                path="/employees/:employeeId/edit"
+                element={<EditEmployeeForm />}
               />
             </Route>
           </Routes>

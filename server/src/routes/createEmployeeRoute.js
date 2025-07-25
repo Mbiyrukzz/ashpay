@@ -1,6 +1,9 @@
 const { v4: uuidv4 } = require('uuid')
 const Employee = require('../models/Employee')
 const { calculateStatutoryDeductions } = require('../controllers/kraDeductions')
+const {
+  getEmployeeBenefitsForEmployee,
+} = require('../controllers/employeeBenefits')
 
 const validatePhone = (phone) => /^(\+?\d{10,15})$/.test(phone)
 
@@ -18,7 +21,7 @@ const createEmployeeRoute = {
         position,
         salary,
         deductions = [],
-        benefits = [],
+        benefits = {}, // Changed: now expects an object with benefitOverrides and excludedBenefits
         bankDetails = {},
         employeeId,
         id = uuidv4(),
@@ -63,24 +66,24 @@ const createEmployeeRoute = {
       // Calculate KRA deductions
       const kraDeductions = calculateStatutoryDeductions(parseFloat(salary))
 
-      // Combine user-provided deductions with KRA deductions
-      // User deductions should be in format: ['Loan Repayment', 'Advance Salary']
-      // Convert to objects with amount if they're strings
+      // Handle additional deductions from frontend
+      // Frontend sends an array of strings for additional deductions
       const userDeductions = deductions.map((ded) => {
         if (typeof ded === 'string') {
           return { type: ded, amount: 0 } // User will need to specify amounts later
         }
-        return ded
+        return ded // Already an object with type and amount
       })
 
       const allDeductions = [...kraDeductions, ...userDeductions]
 
-      // Process benefits similarly
-      const processedBenefits = benefits.map((benefit) => {
-        if (typeof benefit === 'string') {
-          return { type: benefit, amount: 0 }
-        }
-        return benefit
+      // Process benefits - handle the new structure from frontend
+      const { benefitOverrides = {}, excludedBenefits = [] } = benefits
+
+      const processedBenefits = getEmployeeBenefitsForEmployee({
+        gross: parseFloat(salary),
+        benefitOverrides,
+        excludedBenefits,
       })
 
       // Generate employee ID if not provided

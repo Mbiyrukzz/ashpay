@@ -1,8 +1,16 @@
+// models/Employee.js
 const { v4: uuidv4 } = require('uuid')
 const mongoose = require('mongoose')
 
 // Deduction sub-schema
 const deductionSchema = new mongoose.Schema({
+  type: { type: String, required: true, trim: true },
+  amount: { type: Number, required: true, min: 0 },
+  recurring: { type: Boolean, default: true },
+})
+
+// Benefit sub-schema
+const benefitSchema = new mongoose.Schema({
   type: { type: String, required: true, trim: true },
   amount: { type: Number, required: true, min: 0 },
   recurring: { type: Boolean, default: true },
@@ -32,7 +40,7 @@ const employeeSchema = new mongoose.Schema(
     department: { type: String, trim: true },
     salary: { type: Number, required: true, min: 0 },
     deductions: { type: [deductionSchema], default: [] },
-    benefits: { type: [String], default: [] },
+    benefits: { type: [benefitSchema], default: [] }, // Updated to use benefitSchema
     netPay: { type: Number, default: 0 },
     bankDetails: {
       bankName: { type: String, trim: true },
@@ -48,7 +56,8 @@ const employeeSchema = new mongoose.Schema(
 // Auto-calculate netPay before saving
 employeeSchema.pre('save', function (next) {
   const totalDeductions = this.deductions.reduce((sum, d) => sum + d.amount, 0)
-  this.netPay = this.salary - totalDeductions
+  const totalBenefits = this.benefits.reduce((sum, b) => sum + b.amount, 0)
+  this.netPay = this.salary - totalDeductions + totalBenefits
   next()
 })
 

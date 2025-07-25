@@ -1,5 +1,5 @@
 import React, { useContext, useEffect, useState } from 'react'
-import { useParams } from 'react-router-dom'
+import { useParams, useNavigate } from 'react-router-dom'
 import EmployeeContext from '../contexts/EmployeeContext'
 import styled from 'styled-components'
 import Loading from '../components/Loading'
@@ -60,10 +60,32 @@ const ListItem = styled.li`
   color: #2d3748;
 `
 
+const ButtonGroup = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+`
+
+const ActionButton = styled.button`
+  background-color: #2b6cb0;
+  color: white;
+  border: none;
+  padding: 0.5rem 1.25rem;
+  border-radius: 0.5rem;
+  cursor: pointer;
+  font-weight: 600;
+  transition: background 0.2s;
+
+  &:hover {
+    background-color: #2c5282;
+  }
+`
+
 const EmployeeDetailsPage = () => {
   const { employeeId } = useParams()
   const { employees, fetchEmployees } = useContext(EmployeeContext)
   const [employee, setEmployee] = useState(null)
+  const navigate = useNavigate()
 
   useEffect(() => {
     if (!employees.length) {
@@ -72,12 +94,28 @@ const EmployeeDetailsPage = () => {
   }, [fetchEmployees, employees.length])
 
   useEffect(() => {
-    const found = employees.find((e) => e._id === employeeId) // match with MongoDB _id
+    const found = employees.find((e) => e._id === employeeId)
     setEmployee(found)
   }, [employees, employeeId])
 
   if (!employee) {
     return <Loading />
+  }
+
+  const handleEdit = () => {
+    navigate(`/employees/${employeeId}/edit`)
+  }
+
+  const handleLoan = () => {
+    navigate(`/employees/${employeeId}/loan`)
+  }
+
+  const handleAdvance = () => {
+    navigate(`/employees/${employeeId}/advance`)
+  }
+
+  const handleOvertime = () => {
+    navigate(`/employees/${employeeId}/overtime`)
   }
 
   return (
@@ -99,15 +137,19 @@ const EmployeeDetailsPage = () => {
         </Row>
         <Row>
           <Label>Department:</Label>
-          <Value>{employee.department}</Value>
+          <Value>{employee.department || 'N/A'}</Value>
         </Row>
         <Row>
           <Label>Position:</Label>
-          <Value>{employee.position}</Value>
+          <Value>{employee.position || 'N/A'}</Value>
         </Row>
         <Row>
-          <Label>Salary:</Label>
+          <Label>Gross Salary:</Label>
           <Value>KES {employee.salary.toLocaleString()}</Value>
+        </Row>
+        <Row>
+          <Label>Net Salary:</Label>
+          <Value>KES {employee.netPay.toLocaleString()}</Value>
         </Row>
       </Section>
 
@@ -133,13 +175,23 @@ const EmployeeDetailsPage = () => {
           {employee.benefits?.length ? (
             employee.benefits.map((b, idx) => (
               <ListItem key={idx}>
-                {b.type || b.name} - KES {b.amount?.toLocaleString?.() || '0'}
+                {b.type} - KES {b.amount.toLocaleString()}{' '}
+                {b.recurring ? '(Recurring)' : ''}
               </ListItem>
             ))
           ) : (
             <ListItem>None</ListItem>
           )}
         </List>
+      </Section>
+
+      <Section>
+        <ButtonGroup>
+          <ActionButton onClick={handleLoan}>Loan</ActionButton>
+          <ActionButton onClick={handleAdvance}>Advance</ActionButton>
+          <ActionButton onClick={handleOvertime}>Overtime</ActionButton>
+          <ActionButton onClick={handleEdit}>Edit</ActionButton>
+        </ButtonGroup>
       </Section>
     </Container>
   )

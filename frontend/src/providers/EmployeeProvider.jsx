@@ -42,10 +42,14 @@ const EmployeeProvider = ({ children }) => {
     } finally {
       setLoading(false)
     }
-  }, [get, isReady])
+  }, [get, isReady, user])
 
   const createEmployee = async (employeeData) => {
     try {
+      if (!employeeData.name || !employeeData.email || !employeeData.salary) {
+        throw new Error('Name, email, and salary are required.')
+      }
+
       const response = await post(`${API_URL}/employees`, employeeData, {
         headers: {
           'Content-Type': 'application/json',
@@ -61,10 +65,13 @@ const EmployeeProvider = ({ children }) => {
     } catch (err) {
       console.error('❌ Error creating employee:', err)
 
-      // Handle different types of errors
       if (err.response?.status === 409) {
-        throw new Error('Employee with this email already exists')
+        throw new Error(err.response.data?.error || 'Duplicate employee entry')
       } else if (err.response?.status === 400) {
+        const details = err.response.data?.details
+        if (details && Array.isArray(details)) {
+          throw new Error(details.join(', '))
+        }
         throw new Error(err.response.data?.error || 'Invalid employee data')
       } else if (err.response?.data?.error) {
         throw new Error(err.response.data.error)
