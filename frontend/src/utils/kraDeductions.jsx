@@ -7,65 +7,117 @@ export const calculateKraDeductions = (salary) => {
   const deductions = []
   const salaryNum = parseFloat(salary)
 
-  // NHIF
-  let nhif = 0
-  if (salaryNum <= 5999) nhif = 150
-  else if (salaryNum <= 7999) nhif = 300
-  else if (salaryNum <= 11999) nhif = 400
-  else if (salaryNum <= 14999) nhif = 500
-  else if (salaryNum <= 19999) nhif = 600
-  else if (salaryNum <= 24999) nhif = 750
-  else if (salaryNum <= 29999) nhif = 850
-  else if (salaryNum <= 34999) nhif = 900
-  else if (salaryNum <= 39999) nhif = 950
-  else if (salaryNum <= 44999) nhif = 1000
-  else if (salaryNum <= 49999) nhif = 1100
-  else if (salaryNum <= 59999) nhif = 1200
-  else if (salaryNum <= 69999) nhif = 1300
-  else if (salaryNum <= 79999) nhif = 1400
-  else if (salaryNum <= 89999) nhif = 1500
-  else if (salaryNum <= 99999) nhif = 1600
-  else nhif = 1700
+  // SHIF (Social Health Insurance Fund) - 2.75% of gross salary
+  const shif = salaryNum * 0.0275
+  deductions.push({
+    type: 'SHIF',
+    amount: Math.round(shif),
+    recurring: true,
+    description: 'Social Health Insurance Fund (2.75% of gross)',
+  })
 
-  deductions.push({ type: 'NHIF', amount: nhif, recurring: true })
+  // NSSF - Based on LEL and UEL structure with Tier 1 and Tier 2
+  let nssfAmount = 0
+  let tier1Amount = 0
+  let tier2Amount = 0
 
-  // NSSF
-  const nssf = Math.min(salaryNum * 0.06, 1080)
-  deductions.push({ type: 'NSSF', amount: Math.round(nssf), recurring: true })
+  // Lower Earnings Limit (LEL): KES 8,000
+  // Upper Earnings Limit (UEL): KES 72,000
+  // Employee contributes 6% on pensionable earnings between LEL and UEL
 
-  // Housing Levy
+  const lel = 8000 // Lower Earnings Limit
+  const uel = 72000 // Upper Earnings Limit
+
+  // Tier 1: Contribution on earnings up to LEL (KES 8,000)
+  if (salaryNum > 0) {
+    const tier1Base = Math.min(salaryNum, lel)
+    tier1Amount = tier1Base * 0.06 // 6% on earnings up to LEL
+  }
+
+  // Tier 2: Contribution on earnings above LEL up to UEL
+  if (salaryNum > lel) {
+    const tier2Base = Math.min(salaryNum, uel) - lel
+    tier2Amount = tier2Base * 0.06 // 6% on earnings between LEL and UEL
+  }
+
+  // Total NSSF = Tier 1 + Tier 2, capped at KES 4,320
+  nssfAmount = Math.min(tier1Amount + tier2Amount, 4320)
+
+  let nssfDescription = ''
+  if (salaryNum <= 0) {
+    nssfDescription = 'No NSSF contribution'
+  } else if (salaryNum <= lel) {
+    nssfDescription = `NSSF Tier 1: 6% on KES ${Math.min(
+      salaryNum,
+      lel
+    ).toLocaleString()}`
+  } else {
+    const tier1Base = Math.min(salaryNum, lel)
+    const tier2Base = Math.min(salaryNum, uel) - lel
+    nssfDescription = `NSSF - Tier 1: 6% on KES ${tier1Base.toLocaleString()} + Tier 2: 6% on KES ${tier2Base.toLocaleString()}`
+    if (tier1Amount + tier2Amount > 4320) {
+      nssfDescription += ' (capped at KES 4,320)'
+    }
+  }
+
+  deductions.push({
+    type: 'NSSF',
+    amount: Math.round(nssfAmount),
+    recurring: true,
+    description: nssfDescription,
+    tier1: Math.round(tier1Amount),
+    tier2: Math.round(tier2Amount),
+  })
+
+  // Housing Levy - 1.5% of gross salary
   const housingLevy = salaryNum * 0.015
   deductions.push({
     type: 'Housing Levy',
     amount: Math.round(housingLevy),
     recurring: true,
+    description: 'Affordable Housing Levy (1.5% of gross)',
   })
 
-  // PAYE
+  // PAYE - Updated to start from KES 27,000
   let paye = 0
-  if (salaryNum <= 24000) {
+  let payeDescription = ''
+
+  if (salaryNum <= 27000) {
     paye = 0
+    payeDescription = 'No PAYE tax (salary ≤ KES 27,000)'
   } else if (salaryNum <= 32333) {
-    paye = (salaryNum - 24000) * 0.25
+    paye = (salaryNum - 27000) * 0.25
+    payeDescription = '25% on amount above KES 27,000'
   } else if (salaryNum <= 500000) {
-    paye = (32333 - 24000) * 0.25 + (salaryNum - 32333) * 0.3
+    paye = (32333 - 27000) * 0.25 + (salaryNum - 32333) * 0.3
+    payeDescription = '25% (KES 27,001-32,333) + 30% (above KES 32,333)'
   } else if (salaryNum <= 800000) {
     paye =
-      (32333 - 24000) * 0.25 +
+      (32333 - 27000) * 0.25 +
       (500000 - 32333) * 0.3 +
       (salaryNum - 500000) * 0.325
+    payeDescription = 'Progressive rates up to 32.5%'
   } else {
     paye =
-      (32333 - 24000) * 0.25 +
+      (32333 - 27000) * 0.25 +
       (500000 - 32333) * 0.3 +
       (800000 - 500000) * 0.325 +
       (salaryNum - 800000) * 0.35
+    payeDescription = 'Progressive rates up to 35%'
   }
 
   const personalRelief = 2400
+  const grossPaye = paye
   paye = Math.max(paye - personalRelief, 0)
 
-  deductions.push({ type: 'PAYE', amount: Math.round(paye), recurring: true })
+  deductions.push({
+    type: 'PAYE',
+    amount: Math.round(paye),
+    recurring: true,
+    description:
+      payeDescription +
+      (grossPaye > 0 ? ' (less KES 2,400 personal relief)' : ''),
+  })
 
   return deductions
 }
@@ -139,15 +191,16 @@ export const calculateSalaryBreakdown = (
 export const validatePayeCalculation = (salary, payeAmount) => {
   const salaryNum = parseFloat(salary) || 0
 
-  if (salaryNum < 24000 && payeAmount > 0) {
+  // Updated validation for new PAYE threshold
+  if (salaryNum < 27000 && payeAmount > 0) {
     return {
       isValid: false,
-      warning: `PAYE should be 0 for salaries below KES 24,000. Current PAYE: KES ${payeAmount.toLocaleString()}`,
+      warning: `PAYE should be 0 for salaries below KES 27,000. Current PAYE: KES ${payeAmount.toLocaleString()}`,
     }
   }
 
   if (salaryNum >= 50000 && salaryNum <= 100000) {
-    const expectedRange = { min: 2000, max: 15000 }
+    const expectedRange = { min: 1500, max: 15000 }
     if (payeAmount < expectedRange.min || payeAmount > expectedRange.max) {
       return {
         isValid: false,
