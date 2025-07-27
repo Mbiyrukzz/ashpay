@@ -1,5 +1,3 @@
-// controllers/kraDeductions.js - Updated backend KRA calculations
-
 /**
  * Calculate statutory deductions according to updated Kenyan tax laws
  * @param {number} grossSalary - The gross salary amount
@@ -91,30 +89,30 @@ const calculateStatutoryDeductions = (grossSalary) => {
   let paye = 0
   let payeDescription = ''
 
-  if (salary <= 27000) {
+  if (salary <= 24000) {
     // No tax for salaries below or equal to KES 27,000
     paye = 0
     payeDescription = 'No PAYE tax (salary ≤ KES 27,000)'
   } else if (salary <= 32333) {
     // 25% on income between KES 27,001 and KES 32,333
-    paye = (salary - 27000) * 0.25
+    paye = (salary - 24000) * 0.25
     payeDescription = '25% on amount above KES 27,000'
   } else if (salary <= 500000) {
     // 25% on KES 27,001-32,333, then 30% on KES 32,334-500,000
-    const tier1 = (32333 - 27000) * 0.25
+    const tier1 = (32333 - 24000) * 0.25
     const tier2 = (salary - 32333) * 0.3
     paye = tier1 + tier2
     payeDescription = '25% (KES 27,001-32,333) + 30% (above KES 32,333)'
   } else if (salary <= 800000) {
     // Previous tiers + 32.5% on KES 500,001-800,000
-    const tier1 = (32333 - 27000) * 0.25
+    const tier1 = (32333 - 24000) * 0.25
     const tier2 = (500000 - 32333) * 0.3
     const tier3 = (salary - 500000) * 0.325
     paye = tier1 + tier2 + tier3
     payeDescription = 'Progressive rates up to 32.5%'
   } else {
     // All previous tiers + 35% on amount above KES 800,000
-    const tier1 = (32333 - 27000) * 0.25
+    const tier1 = (32333 - 24000) * 0.25
     const tier2 = (500000 - 32333) * 0.3
     const tier3 = (800000 - 500000) * 0.325
     const tier4 = (salary - 800000) * 0.35
@@ -191,15 +189,15 @@ const validatePayeCalculation = (grossSalary, payeAmount) => {
   const salary = parseFloat(grossSalary)
 
   // Updated validation for new PAYE threshold (KES 27,000)
-  if (salary <= 27000 && payeAmount > 0) {
+  if (salary <= 24000 && payeAmount > 0) {
     return {
       isValid: false,
       warning: `PAYE should be 0 for salaries ≤ KES 27,000. Got KES ${payeAmount}`,
     }
   }
 
-  if (salary > 27000 && salary <= 32333) {
-    const expectedPaye = Math.max((salary - 27000) * 0.25 - 2400, 0)
+  if (salary > 24000 && salary <= 32333) {
+    const expectedPaye = Math.max((salary - 24000) * 0.25 - 2400, 0)
     const tolerance = 100 // Allow KES 100 tolerance for rounding
 
     if (Math.abs(payeAmount - expectedPaye) > tolerance) {

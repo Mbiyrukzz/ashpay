@@ -82,24 +82,24 @@ export const calculateKraDeductions = (salary) => {
   let paye = 0
   let payeDescription = ''
 
-  if (salaryNum <= 27000) {
+  if (salaryNum <= 24000) {
     paye = 0
     payeDescription = 'No PAYE tax (salary ≤ KES 27,000)'
   } else if (salaryNum <= 32333) {
-    paye = (salaryNum - 27000) * 0.25
+    paye = (salaryNum - 24000) * 0.25
     payeDescription = '25% on amount above KES 27,000'
   } else if (salaryNum <= 500000) {
-    paye = (32333 - 27000) * 0.25 + (salaryNum - 32333) * 0.3
+    paye = (32333 - 24000) * 0.25 + (salaryNum - 32333) * 0.3
     payeDescription = '25% (KES 27,001-32,333) + 30% (above KES 32,333)'
   } else if (salaryNum <= 800000) {
     paye =
-      (32333 - 27000) * 0.25 +
+      (32333 - 24000) * 0.25 +
       (500000 - 32333) * 0.3 +
       (salaryNum - 500000) * 0.325
     payeDescription = 'Progressive rates up to 32.5%'
   } else {
     paye =
-      (32333 - 27000) * 0.25 +
+      (32333 - 24000) * 0.25 +
       (500000 - 32333) * 0.3 +
       (800000 - 500000) * 0.325 +
       (salaryNum - 800000) * 0.35
@@ -192,7 +192,7 @@ export const validatePayeCalculation = (salary, payeAmount) => {
   const salaryNum = parseFloat(salary) || 0
 
   // Updated validation for new PAYE threshold
-  if (salaryNum < 27000 && payeAmount > 0) {
+  if (salaryNum < 24000 && payeAmount > 0) {
     return {
       isValid: false,
       warning: `PAYE should be 0 for salaries below KES 27,000. Current PAYE: KES ${payeAmount.toLocaleString()}`,
